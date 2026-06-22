@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pwgen-api
+  labels:
+    app.kubernetes.io/name: pwgen-api
+spec:
+  replicas: 2 # baseline; the HPA owns scaling from here
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: pwgen-api
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: pwgen-api
+      annotations:
+        # Prometheus scrape config (if you use annotation-based discovery).
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532 # matches distroless :nonroot
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: pwgen-api
+          image: ghcr.io/cudneys/pwgen-api:latest # replace with your registry/tag
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: LISTEN_ADDR
+              value: ":8080"
+            - name: LOG_LEVEL
+              value: "info"
+            - name: ROUTER_SERVICE
+              value: "http://router-service.default.svc.cluster.local"
+            # OTLP/gRPC collector endpoint for trace export.
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://otel-collector.observability.svc.cluster.local:4317"
+            - name: OTEL_SERVICE_NAME
+              value: "pwgen-api"
+          resources:
+            # Requests must be set for the HPA's CPU/memory targets to work.
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 128Mi
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        # readOnlyRootFilesystem is true, so give the app a writable /tmp.
+        - name: tmp
+          emptyDir: {}
