@@ -45,6 +45,9 @@ jobs:
         with:
           context: .
           push: true
+          # Bake the tag-derived version into the binary (service.version trace attr).
+          build-args: |
+            VERSION=${{ steps.meta.outputs.version }}
           # Only the explicit numeric version — no 1, 1.2, or latest.
           tags: ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.version }}
           cache-from: type=gha

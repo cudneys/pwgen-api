@@ -22,6 +22,11 @@ import (
 
 const serviceName = "pwgen-api"
 
+// version is the build version, overridden at build time via
+// -ldflags "-X main.version=<v>". It is reported as the service.version
+// attribute on all telemetry.
+var version = "dev"
+
 func main() {
 	logger := logging.Setup()
 
@@ -38,7 +43,7 @@ func main() {
 
 	ctx := context.Background()
 
-	tp, err := telemetry.Setup(ctx, serviceName)
+	tp, err := telemetry.Setup(ctx, serviceName, version)
 	if err != nil {
 		logger.Error("failed to initialise telemetry", slog.Any("error", err))
 		os.Exit(1)

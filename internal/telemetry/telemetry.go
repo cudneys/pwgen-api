@@ -31,7 +31,8 @@ func (p *Providers) Shutdown(ctx context.Context) error {
 	return p.shutdown(ctx)
 }
 
-// Setup initialises tracing and metrics.
+// Setup initialises tracing and metrics. serviceVersion is reported as the
+// service.version resource attribute on all emitted telemetry.
 //
 //   - Traces are exported over OTLP/gRPC to the agent configured via the standard
 //     OTEL_EXPORTER_OTLP_ENDPOINT / OTEL_EXPORTER_OTLP_TRACES_ENDPOINT env vars.
@@ -39,8 +40,11 @@ func (p *Providers) Shutdown(ctx context.Context) error {
 //     /metrics endpoint that main.go mounts.
 //   - The global propagator is set to W3C trace-context + baggage so incoming
 //     trace headers are honoured and outbound requests carry them forward.
-func Setup(ctx context.Context, serviceName string) (*Providers, error) {
-	attrs := []attribute.KeyValue{semconv.ServiceName(serviceName)}
+func Setup(ctx context.Context, serviceName, serviceVersion string) (*Providers, error) {
+	attrs := []attribute.KeyValue{
+		semconv.ServiceName(serviceName),
+		semconv.ServiceVersion(serviceVersion),
+	}
 	// Tag spans with the originating pod when running in Kubernetes. The pod
 	// name/namespace are injected via the downward API (see k8s/deployment.yaml).
 	if podName := os.Getenv("POD_NAME"); podName != "" {
