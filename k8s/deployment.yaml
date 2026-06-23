@@ -28,7 +28,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: pwgen-api
-          image: ghcr.io/cudneys/pwgen-api:0.0.6
+          image: ghcr.io/cudneys/pwgen-api:0.0.7
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -41,9 +41,11 @@ spec:
             - name: ROUTER_SERVICE
               value: "http://pwgen-router"
             # Comma-separated list of origins allowed via CORS ("*" allows any).
-            # Leave unset/empty to disable CORS entirely.
+            # Each entry must be a full origin including scheme (and port if
+            # non-default), e.g. "https://pw.scotts.house" — matching is exact
+            # against the browser's Origin header. Leave unset/empty to disable.
             - name: CORS_ALLOWED_ORIGINS
-              value: "pw.scotts.house"
+              value: "https://pw.scotts.house"
             # OTLP/gRPC collector endpoint for trace export.
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: "https://lee-trace-ingest.apporto.com:443"

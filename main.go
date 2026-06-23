@@ -66,6 +66,10 @@ func main() {
 	corsOrigins := cors.ParseOrigins(os.Getenv("CORS_ALLOWED_ORIGINS"))
 	if len(corsOrigins) > 0 {
 		logger.Info("CORS enabled", slog.Any("allowed_origins", corsOrigins))
+		if bad := cors.Suspicious(corsOrigins); len(bad) > 0 {
+			logger.Warn("CORS origins missing a scheme will never match a browser Origin header; use e.g. https://host",
+				slog.Any("origins", bad))
+		}
 	}
 	router.Use(cors.Middleware(corsOrigins))
 	// otelgin extracts incoming trace headers and starts a server span per request.

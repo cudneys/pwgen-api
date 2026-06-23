@@ -23,6 +23,23 @@ func ParseOrigins(s string) []string {
 	return out
 }
 
+// Suspicious returns the origins that look misconfigured: entries that are not
+// "*" yet lack a scheme (e.g. "pw.example.com" instead of "https://pw.example.com").
+// A browser's Origin header always includes a scheme, so such entries can never
+// match. Callers can log these at startup to surface the mistake early.
+func Suspicious(origins []string) []string {
+	var bad []string
+	for _, o := range origins {
+		if o == "*" {
+			continue
+		}
+		if !strings.Contains(o, "://") {
+			bad = append(bad, o)
+		}
+	}
+	return bad
+}
+
 // Middleware returns a gin middleware that emits CORS headers for the given
 // allowed origins. A single entry of "*" allows any origin. If origins is empty
 // the middleware is a no-op, so CORS stays off unless explicitly configured.
