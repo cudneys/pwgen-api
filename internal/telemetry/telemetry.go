@@ -5,8 +5,10 @@ package telemetry
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	promexporter "go.opentelemetry.io/otel/exporters/prometheus"
 	"go.opentelemetry.io/otel/propagation"
@@ -38,17 +40,34 @@ func (p *Providers) Shutdown(ctx context.Context) error {
 //   - The global propagator is set to W3C trace-context + baggage so incoming
 //     trace headers are honoured and outbound requests carry them forward.
 func Setup(ctx context.Context, serviceName string) (*Providers, error) {
+	attrs := []attribute.KeyValue{semconv.ServiceName(serviceName)}
+	// Tag spans with the originating pod when running in Kubernetes. The pod
+	// name/namespace are injected via the downward API (see k8s/deployment.yaml).
+	if podName := os.Getenv("POD_NAME"); podName != "" {
+		attrs = append(attrs, semconv.K8SPodName(podName))
+	}
+	if podNamespace := os.Getenv("POD_NAMESPACE"); podNamespace != "" {
+		attrs = append(attrs, semconv.K8SNamespaceName(podNamespace))
+	}
+
 	res, err := resource.New(ctx,
 		resource.WithFromEnv(),
 		resource.WithTelemetrySDK(),
-		resource.WithAttributes(semconv.ServiceName(serviceName)),
+		resource.WithAttributes(attrs...),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("build resource: %w", err)
 	}
 
-	// Tracing: OTLP/gRPC exporter to the agent.
-	traceExp, err := otlptracegrpc.New(ctx)
+	// Tracing: OTLP/gRPC exporter to the agent. Authenticate with a bearer token
+	// when one is provided (sourced from the otel-bearer-token secret in k8s).
+	var traceOpts []otlptracegrpc.Option
+	if token := os.Getenv("OTEL_EXPORTER_OTLP_BEARER_TOKEN"); token != "" {
+		traceOpts = append(traceOpts, otlptracegrpc.WithHeaders(map[string]string{
+			"Authorization": "Bearer " + token,
+		}))
+	}
+	traceExp, err := otlptracegrpc.New(ctx, traceOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("create otlp trace exporter: %w", err)
 	}
