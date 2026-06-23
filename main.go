@@ -14,6 +14,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 
+	"github.com/cudneys/pwgen-api/internal/cors"
 	"github.com/cudneys/pwgen-api/internal/httpapi"
 	"github.com/cudneys/pwgen-api/internal/logging"
 	"github.com/cudneys/pwgen-api/internal/passwordgen"
@@ -59,6 +60,14 @@ func main() {
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
 	router.Use(gin.Recovery())
+	// CORS: enabled only when CORS_ALLOWED_ORIGINS is set (comma-separated list
+	// of origins, or "*" for any). Registered before otelgin so preflight
+	// OPTIONS requests short-circuit without producing a trace span.
+	corsOrigins := cors.ParseOrigins(os.Getenv("CORS_ALLOWED_ORIGINS"))
+	if len(corsOrigins) > 0 {
+		logger.Info("CORS enabled", slog.Any("allowed_origins", corsOrigins))
+	}
+	router.Use(cors.Middleware(corsOrigins))
 	// otelgin extracts incoming trace headers and starts a server span per request.
 	// Skip /healthz so liveness/readiness probes don't flood the trace backend.
 	router.Use(otelgin.Middleware(serviceName, otelgin.WithFilter(func(r *http.Request) bool {
