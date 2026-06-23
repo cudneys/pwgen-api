@@ -60,7 +60,10 @@ func main() {
 	router := gin.New()
 	router.Use(gin.Recovery())
 	// otelgin extracts incoming trace headers and starts a server span per request.
-	router.Use(otelgin.Middleware(serviceName))
+	// Skip /healthz so liveness/readiness probes don't flood the trace backend.
+	router.Use(otelgin.Middleware(serviceName, otelgin.WithFilter(func(r *http.Request) bool {
+		return r.URL.Path != "/healthz"
+	})))
 
 	router.GET("/healthz", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"status": "ok"}) })
 	router.GET("/metrics", gin.WrapH(promhttp.Handler()))
