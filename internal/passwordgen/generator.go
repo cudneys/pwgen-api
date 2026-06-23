@@ -5,6 +5,7 @@ package passwordgen
 import (
 	"context"
 	"crypto/rand"
+	"encoding/json"
 	"fmt"
 	"io"
 	"math/big"
@@ -118,7 +119,18 @@ func (g *Generator) fetchChar(ctx context.Context) (rune, error) {
 		return 0, err
 	}
 
-	s := strings.TrimSpace(string(body))
+	// The router responds with a JSON object: {"character":"b"}.
+	var payload struct {
+		Character string `json:"character"`
+	}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		err := fmt.Errorf("decode backend response: %w", err)
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+		return 0, err
+	}
+
+	s := strings.TrimSpace(payload.Character)
 	if s == "" {
 		err := fmt.Errorf("backend returned empty character")
 		span.RecordError(err)
